@@ -37,11 +37,11 @@ export default class ContentCommonEdit extends Component {
 		}
 
 		if ( !props.nopublish ) {
-			if ( props.published ) {
-				//ShowPublish = <ButtonBase><SVGIcon>publish</SVGIcon><span>Published</span></ButtonBase>;
-			}
-			else if ( !props.published ) {
+			if ( !props.published ) {
 				ShowPublish = <ButtonBase class="-available -publish" onclick={props.onpublish}><SVGIcon>publish</SVGIcon><div class="if-sidebar-block">Publish</div></ButtonBase>;
+			}
+			else {
+				ShowPublish = <ButtonBase class="-available -publish" onclick={props.ondone}><SVGIcon>checkmark</SVGIcon><div class="if-sidebar-block">Done</div></ButtonBase>;
 			}
 			// Otherwise, published is null, so publish button is not shown
 		}

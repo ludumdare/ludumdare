@@ -31,8 +31,8 @@ export default class ViewBar extends Component {
 		this.state - {
 			'notifications': 0,
 			'notificationsHidden': 0,
-			'notificationsFeed': {},
-			'notificationsMore': false,
+			'notificationsFeed': null,
+			//'notificationsMore': false,
 		};
 
 		this.handleNotificationsClear = this.handleNotificationsClear.bind(this);
@@ -43,8 +43,8 @@ export default class ViewBar extends Component {
 		this.setState({
 			'notifications': 0,
 			'notificationsHidden': 0,
-			'notificationsFeed': {},
-			'notificationsMore': false,
+			//'notificationsFeed': null,
+			//'notificationsMore': false,
 		});
 	}
 
@@ -67,25 +67,48 @@ export default class ViewBar extends Component {
 				setTimeout(() => this.checkNotificationCount(), 20000);
 			}
 			else {
-				$Notification.GetFeedUnreadFiltered(0, fetchCount)
+				const {notifications, notificationsFeed} = this.state;
+				$Notification.GetCountUnread()
 				.then(r => {
-					if (this.state.notifications != r.count) {
-						this.setState({
-							'notifications': r.count,
-							'notificationsHidden': r.countFiltered,
-							'notificationsMore': r.countFiltered + r.count == fetchCount,
-							'notificationsFeed': r,
-						});
+					if (r.status !== 200) {
+						location.href = '# expired';
+						setTimeout(() => this.checkNotificationCount(), 5 * 60000);
+						return Promise.reject();
 					}
-					setTimeout(() => this.checkNotificationCount(), 60000);
+					const newUnfilteredCount = r.count;
+					// Only get unread if there's a possibility that there are new notifications
+					// Only get the feed in general if it hasn't been requested before.
+					const request = newUnfilteredCount > (notifications || 0) ?
+						$Notification.GetFeedUnreadFiltered :
+             !notificationsFeed && $Notification.GetFeedAllFiltered;
+					request && request(0, fetchCount)
+					.then(r => {
+						if (this.state.notifications != r.count) {
+							this.setState({
+								'notifications': newUnfilteredCount > 0 ? r.count : 0,
+								'notificationsHidden': r.countFiltered,
+								//'notificationsMore': r.countFiltered + r.count == fetchCount,
+								'notificationsFeed': r,
+								'notificationsError': null,
+							});
+						}
+						setTimeout(() => this.checkNotificationCount(), 60000);
+					})
+					.catch((e) => {
+						this.setState({'notificationsError': 'Could not retrieve notifications feed.'});
+						setTimeout(() => this.checkNotificationCount(), 5 * 60000);
+						console.log('[Notificaton error]', e);
+					});
 				})
 				.catch((e) => {
+					this.setState({'notificationsError': 'Could not retrieve notifications count.'});
 					setTimeout(() => this.checkNotificationCount(), 5 * 60000);
-					console.log('[Notificaton error]', e);
+					console.log('[Notificaton count error]', e);
 				});
 			}
 		}
 		else {
+			this.handleNotificationsClear();
 			this.StartedNotificationLoop = false;
 		}
 	}
@@ -93,7 +116,9 @@ export default class ViewBar extends Component {
 	componentDidMount() {
 		document.body.classList.add('_use-view-bar');
 
-		this.checkNotificationCount();
+		if ( !this.StartedNotificationLoop ) {
+			this.checkNotificationCount();
+		}
 	}
 
 	componentWillUnmount() {
@@ -161,11 +186,8 @@ export default class ViewBar extends Component {
 			GoSecure = (
 				<UIButton
 					class="-bar-button"
+					noblank
 					href={SecureURL}
-					onclick={ e => {
-						console.log('secure');
-						location.href = SecureURL;
-					}}
 				>
 					<SVGIcon>unlocked</SVGIcon>
 					<div class="if-sidebar-block">Go to Secure Site</div>
@@ -235,8 +257,10 @@ export default class ViewBar extends Component {
 				ShowNotifications = (
 					<BarNotification
 						feed={this.state.notificationsFeed}
+						anythingToMark={this.state.notifications > 0 || this.state.notificationsHidden > 0}
 						clearCallback={this.handleNotificationsClear}
 						hideCallback={this.handleNotificationsHide}
+						error={this.state.notificationsError}
 					/>
 				);
 			}

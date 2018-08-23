@@ -1,23 +1,25 @@
-import {h, Component} 					from 'preact/preact';
+import {h, Component} 								from 'preact/preact';
 
-import NavLink							from 'com/nav-link/link';
+import NavLink										from 'com/nav-link/link';
 
-import ContentLoading					from 'com/content-loading/loading';
-import ContentError						from 'com/content-error/error';
+import ContentLoading								from 'com/content-loading/loading';
+import ContentError									from 'com/content-error/error';
 
-import ContentCommon					from 'com/content-common/common';
+import ContentCommon								from 'com/content-common/common';
 
-import ContentCommonBody				from 'com/content-common/common-body';
-import ContentCommonBodyBy				from 'com/content-common/common-body-by';
-import ContentCommonBodyTitle			from 'com/content-common/common-body-title';
-import ContentCommonBodyAvatar			from 'com/content-common/common-body-avatar';
-import ContentCommonBodyMarkup			from 'com/content-common/common-body-markup';
+import ContentCommonBody							from 'com/content-common/common-body';
+import ContentCommonBodyBy							from 'com/content-common/common-body-by';
+import ContentCommonBodyTitle						from 'com/content-common/common-body-title';
+import ContentCommonBodyAvatar						from 'com/content-common/common-body-avatar';
+import ContentCommonBodyMarkup						from 'com/content-common/common-body-markup';
 
-import ContentCommonDraft				from 'com/content-common/common-draft';
+import ContentCommonDraft							from 'com/content-common/common-draft';
 
-import ContentCommonEdit				from 'com/content-common/common-edit';
+import ContentCommonEdit							from 'com/content-common/common-edit';
+import ItemTeambuilding								from 'com/content-item/item-teambuilding';
 
-import $Node							from '../../shrub/js/node/node';
+import $Node										from 'shrub/js/node/node';
+import {AutocompleteAtNames, AutocompleteEmojis}	from 'com/content-common/common-autocomplete';
 
 
 export default class ContentSimple extends Component {
@@ -40,10 +42,21 @@ export default class ContentSimple extends Component {
 		this.onPreview = this.onPreview.bind(this);
 		this.onSave = this.onSave.bind(this);
 		this.onPublish = this.onPublish.bind(this);
+		this.onDone = this.onDone.bind(this);
 
 		this.onModifyTitle = this.onModifyTitle.bind(this);
 		this.onModifyText = this.onModifyText.bind(this);
 		this.onModifyAvatar = this.onModifyAvatar.bind(this);
+
+		this.onKeyDown = this.onKeyDown.bind(this);
+		this.onKeyUp = this.onKeyUp.bind(this);
+		this.onTextAreaBlur = this.onTextAreaBlur.bind(this);
+		this.onTextAreaFocus = this.onTextAreaFocus.bind(this);
+		this.onTextAreaCaret = this.onTextAreaCaret.bind(this);
+		this.onAutocompleteSelect = this.onAutocompleteSelect.bind(this);
+		this.onAutoselectCaptureKeyDown = this.onAutoselectCaptureKeyDown.bind(this);
+		this.onAutoselectCaptureKeyUp = this.onAutoselectCaptureKeyUp.bind(this);
+		this.autocompleters = {};
 	}
 
 	componentDidMount() {
@@ -62,22 +75,96 @@ export default class ContentSimple extends Component {
 			this.setState({'editing': true});
 		}
 
+		if ( this.props.authors ) {
+			this.getAuthors(newProps.node);
+		}
+
 		if ( this.props.node !== newProps.node ) {
 			if ( this.props.authored ) {
 				this.getAuthor(newProps.node);
 			}
-			if ( this.props.authors ) {
-				this.getAuthors(newProps.node);
+		}
+	}
+
+	isIdenticalAuthorLists(a, b) {
+		if (!a !== !b) return false;
+		if (!a) return true;
+		if (a.length !== b.length) return false;
+		return a.filter((a, idx) => b.indexOf(a) === idx).length === a.length;
+	}
+
+	onAutocompleteSelect(replaceText, cursorPosAfterUpdate) {
+		this.setState({
+			'body': replaceText,
+			'modified': replaceText !== this.state.body,
+			'editText': replaceText,
+			'replaceText': replaceText,
+			'replaceCursorPos': cursorPosAfterUpdate,
+			'replaceTextEvent': this.state.replaceTextEvent ? this.state.replaceTextEvent + 1 : 1,
+		});
+	}
+
+	onAutoselectCaptureKeyDown(autocompleter, callback) {
+		const {autocompleters} = this;
+		if ( !autocompleters[autocompleter] ) {
+			autocompleters[autocompleter] = {};
+		}
+		autocompleters[autocompleter].captureKeyDown = callback;
+	}
+
+	onAutoselectCaptureKeyUp(autocompleter, callback) {
+		const {autocompleters} = this;
+		if ( !autocompleters[autocompleter] ) {
+			autocompleters[autocompleter] = {};
+		}
+		autocompleters[autocompleter].captureKeyUp = callback;
+	}
+
+	onKeyDown( e ) {
+		const {autocompleters} = this;
+		for ( let autocompleter in autocompleters ) {
+			const state = autocompleters[autocompleter];
+			if ( state.captureKeyDown && !state.captureKeyDown(e) ) {
+				return false;
 			}
 		}
+		return true;
+	}
+
+	onKeyUp( e ) {
+		const {autocompleters} = this;
+		for ( let autocompleter in autocompleters ) {
+			const state = autocompleters[autocompleter];
+			if ( state.captureKeyUp && !state.captureKeyUp(e) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	onTextAreaFocus( e ) {
+		this.setState({'textareaFocus': true});
+		//console.log("TextAreaFocus");
+		return true;
+	}
+
+	onTextAreaBlur( e ) {
+		setTimeout(() => this.setState({'textareaFocus': false}), 300);
+		return true;
+	}
+
+	onTextAreaCaret( e ) {
+		this.setState({'editCursorPos': e.target.selectionStart});
+		//console.log("TextAreaCursor");
+		return true;
 	}
 
 	getAuthors( node ) {
 		// Clear the Authors
 //		this.setState({ authors: [] });
-
-		if ( node.meta && node.meta['author'] ) {
+		if ( node.meta && node.meta.author && !this.isIdenticalAuthorLists(node.meta.author, this.state.authorIds)) {
 			// Lookup the authors
+			this.setState({'authorIds': node.meta.author.map(e => e)});
 			$Node.Get( node.meta['author'] )
 			.then(r => {
 				if ( r.node && r.node.length ) {
@@ -182,11 +269,41 @@ export default class ContentSimple extends Component {
 		});
 	}
 
+	onDone( e ) {
+		if ( this.state.modified ) {
+			console.log('do save first');
+
+			return this.onSave( e )
+			.then( rr => {
+				if ( rr ) {
+					console.log('done');
+					window.location.href = this.props.node.path;
+				}
+			})
+			.catch(err => {
+				console.log(err);
+				this.setState({'error': err});
+				window.location.hash = "#error-publish/"+encodeURI(err.message);
+			});
+		}
+		else {
+			console.log('done');
+			window.location.href = this.props.node.path;
+		}
+	}
+
 	onModifyTitle( e ) {
 		this.setState({'modified': true, 'name': e.target.value});
 	}
 	onModifyText( e ) {
-		this.setState({'modified': true, 'body': e.target.value});
+		this.setState({
+			'modified': true,
+			'body': e.target.value,
+			'editText': e.target.value,
+			'editCursorPos': e.target.selectionStart,
+			'replaceText': null,
+			'textareaFocus': true,
+		});
 	}
 	onModifyAvatar( avatar ) {
 		this.setState({/*'modified': true,*/'avatar': avatar});
@@ -199,13 +316,16 @@ export default class ContentSimple extends Component {
 
 	render( props, state ) {
 		props = Object.assign({}, props);	// Shallow copy we can change props
-		let {node, user, path, extra} = props;
+		let {node, user, path, extra, featured} = props;
 		let {author, authors} = state;
 
 
 		if ( node && ((node.slug && !props.authored && !props.authors) || (node.slug && author && author.slug)) || (node.slug && authors.length) ) {
 			var ShowEditBar = null;
 			var ShowOnly = null;
+			let ShowAutocompleteEmoji;
+			let ShowAutocompleteAt;
+
 
 			if ( this.isEditMode() ) {
 				if ( !node_IsAuthor(node, user) ) {
@@ -220,11 +340,31 @@ export default class ContentSimple extends Component {
 					'onpreview': this.onPreview,
 					'onsave': this.onSave,
 					'onpublish': this.onPublish,
+					'ondone': this.onDone,
 				};
 
 				EditProps.nopublish = props.nopublish;
 
 				ShowEditBar = <ContentCommonEdit {...EditProps} />;
+
+				ShowAutocompleteAt = <AutocompleteAtNames
+					text={state.editText}
+					cursorPos={state.editCursorPos}
+					authors={props.authors}
+					textareaFocus={state.textareaFocus}
+					onSelect={this.onAutocompleteSelect}
+					captureKeyDown={this.onAutoselectCaptureKeyDown}
+					captureKeyUp={this.onAutoselectCaptureKeyUp}
+				/>;
+				ShowAutocompleteEmoji = <AutocompleteEmojis
+					text={state.editText}
+					cursorPos={state.editCursorPos}
+					textareaFocus={state.textareaFocus}
+					onSelect={this.onAutocompleteSelect}
+					captureKeyDown={this.onAutoselectCaptureKeyDown}
+					captureKeyUp={this.onAutoselectCaptureKeyUp}
+				/>;
+
 			}
 			else {
 				if ( node_IsAuthor(node, user) ) {
@@ -243,6 +383,9 @@ export default class ContentSimple extends Component {
 			else if ( props.authors && props.by ) {
 				if ( !state.editing ) {
 					ShowByLine = <ContentCommonBodyBy node={node} authors={authors} by={typeof props.by == 'string' ? props.by : null} />;
+				}
+				else if (node.type == 'item') {
+					ShowByLine = <ItemTeambuilding node={node} authors={authors} featured={featured} user={user} onChange={props.onChangeTeam} />;
 				}
 				else {
 					ShowByLine = (
@@ -304,6 +447,14 @@ export default class ContentSimple extends Component {
 						onmodify={this.onModifyText}
 						minimized={props.minimized}
 						limit={props.limit}
+						onkeydown={this.onKeyDown}
+						onkeyup={this.onKeyUp}
+						onfocus={this.onTextAreaFocus}
+						onblur={this.onTextAreaBlur}
+						oncaret={this.onTextAreaCaret}
+						replaceText={state.replaceText}
+						cursorPos={state.replaceCursorPos}
+						replaceTextEvent={state.replaceTextEvent}
 					>
 						{state.body}
 					</ContentCommonBodyMarkup>
@@ -335,6 +486,8 @@ export default class ContentSimple extends Component {
 					{ShowAbove}
 					{ShowByLine}
 					{ShowMarkup}
+					{ShowAutocompleteAt}
+					{ShowAutocompleteEmoji}
 					{ShowOnly}
 					{props.children}
 				</ContentCommon>

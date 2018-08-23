@@ -17,8 +17,6 @@ import ContentCommonBody				from 'com/content-common/common-body';
 import ContentCommonNav					from 'com/content-common/common-nav';
 import ContentCommonNavButton			from 'com/content-common/common-nav-button';
 import ContentCommonBodyTitle			from 'com/content-common/common-body-title';
-import ContentCommonBodyMarkup			from 'com/content-common/common-body-markup';
-
 
 import ContentSimple					from 'com/content-simple/simple';
 
@@ -180,21 +178,23 @@ export default class ContentEvent extends Component {
 			);
 		}
 
-		props.minmax = true;
+		//props.minmax = true;
 		if ( !IsHome )
 			props.minimized = true;
 
 		return (
 			<ContentSimple {...props}>
 				<ContentCommonNav>
-					{ShowHome}
                     {ShowJoin}
-					{ShowGame}
-					{ShowMyGrades}
-					{ShowFeed}
-					{ShowTheme}
 				</ContentCommonNav>
 			</ContentSimple>
 		);
 	}
+
+//					{ShowHome}
+//					{ShowGame}
+//					{ShowMyGrades}
+//					{ShowFeed}
+//					{ShowTheme}
+
 }
