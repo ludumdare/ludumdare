@@ -343,7 +343,12 @@ switch ( $action ) {
 		$mail = getSanitizedMailFromPost();
 		$RESPONSE['mail'] = $mail;
 
-		/// @todo Add e-mail blacklist checking here
+		/// Confirm it's not a blacklisted email domain (i.e. disposables)
+		require_once __DIR__."/".SHRUB_PATH."email/blacklist.php";
+
+		if ( is_disposable_email($mail) ) {
+			json_EmitFatalError_Server("This address is blacklisted.", $RESPONSE);
+		}
 		/*|| plugin_Call('api_user_create_mail_allowed', $mail)*/
 
 		$ex_user = user_GetByMail($mail);
@@ -409,7 +414,7 @@ switch ( $action ) {
 
 			// If name is too short
 			if ( strlen($name) < USERNAME_MIN_LENGTH ) {
-				json_EmitFatalError_Permission("Name is too short (minimum ".USERNAME_MIN_LENGTH.")", $RESPONSE);
+				json_EmitFatalError_Permission("Name is too short (minimum ".USERNAME_MIN_LENGTH." alphanumeric characters)", $RESPONSE);
 			}
 
 			$slug = coreSlugify_Name($name);

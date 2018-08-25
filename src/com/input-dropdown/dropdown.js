@@ -9,7 +9,7 @@ export default class InputDropdown extends Component {
 		super(props);
 
 		this.state = {
-			'show': props.startExpanded,
+			'show': false,
 			'value': props.value ? props.value : 0
 		};
 
@@ -17,6 +17,7 @@ export default class InputDropdown extends Component {
 
 		this.onShow = this.onShow.bind(this);
 		this.onHide = this.onHide.bind(this);
+		this.doShow = this.doShow.bind(this);
 	}
 
 	doShow( e ) {
@@ -27,6 +28,7 @@ export default class InputDropdown extends Component {
 	doHide( e ) {
 		this.setState({'show': false});
 		document.removeEventListener('click', this.onHide);
+		if (this.props.onhide) this.props.onhide(e);
 	}
 
 	// Clicking on the button
@@ -63,7 +65,23 @@ export default class InputDropdown extends Component {
 		}
 	}
 
-	render( props, {show, value} ) {
+	componentWillReceiveProps(nextProps) {
+			if (nextProps.expanded && !this.state.show) {
+				this.setState({'show': true});
+				setTimeout(this.doShow, 100);
+			}
+	}
+
+	componentDidMount() {
+			if (this.props.expanded && !this.state.show) {
+				this.setState({'show': true});
+				setTimeout(this.doShow, 100);
+			}
+	}
+
+	render( props, state ) {
+		const { show } = state;
+		let value = props.value != null ? props.value : state.value;
 		if ( props.items && props.items.length ) {
 			let {selfManaged, useClickCatcher} = props;
 			let ClickCatcher = null;
@@ -84,6 +102,7 @@ export default class InputDropdown extends Component {
 				if (SelectedField == null) {
 					SelectedField = (
 						<button type="button" onclick={this.onShow}>
+							<SVGIcon>hamburger</SVGIcon>
 							{props.items[0][1]}
 						</button>
 					);
@@ -140,7 +159,10 @@ export default class InputDropdown extends Component {
 
 
 			return (
-				<div class={cN('input-dropdown', props.class)} ref={(input) => { this.dropdown = input; }}>
+				<div
+					class={cN('input-dropdown', props.class)}
+					ref={(input) => { this.dropdown = input; }}
+				>
 					{SelectedField}
 					{ShowItems}
 				</div>
